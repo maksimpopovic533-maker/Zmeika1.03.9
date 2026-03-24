@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Змейка</title>
+<style>
+body { margin:0; background:#0b0b0b; color:#fff; font-family:Arial; text-align:center; overflow:hidden; }
+#menu, #game-container, #leaderboard-menu { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+#game-container, #leaderboard-menu { display:none; position:relative; }
+canvas { background:#000; border:2px solid #333; border-radius:10px; margin-top:20px; }
+input, select, button { padding:6px 10px; border-radius:5px; border:none; margin:3px; cursor:pointer; }
+#creator { position: fixed; top: 5px; left: 10px; font-size:14px; color:white; }
+#version { position: fixed; top: 5px; right: 10px; font-size:14px; color:white; }
+#deviceInfo { position: fixed; bottom: 5px; left: 10px; font-size:12px; color:white; }
+#game-info { position:fixed; left:10px; top:50px; font-size:14px; color:white; text-align:left; }
+#leaderboard-list { max-height:400px; overflow-y:auto; width:350px; text-align:left; margin-top:10px; border:1px solid #444; padding:10px; border-radius:5px; background:#111; }
+#admin-panel { border:1px solid #444; padding:10px; border-radius:5px; background:#111; position:fixed; right:10px; top:50%; transform:translateY(-50%); z-index:10; display:none; flex-direction:column; align-items:center; }
+#admin-input-container { position:fixed; bottom:10px; right:10px; display:flex; flex-direction:column; align-items:flex-end; }
+#admin-input-container input { width:100px; }
+
+#settings-btn { position: fixed; top: 35px; left: 10px; background: #222; border: 1px solid #444; color: #fff; padding: 5px 10px; border-radius: 5px; cursor: pointer; z-index: 1000; }
+#settings-panel { position: fixed; top: 0; left: -300px; width: 260px; height: 100%; background: #161616; transition: 0.3s; z-index: 1001; text-align: left; padding: 20px; border-right: 1px solid #333; }
+#settings-panel.active { left: 0; }
+.s-row { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-size: 13px; }
+.key-set { background: #333; min-width: 50px; color: #00ffcc; text-align: center; border-radius: 3px; cursor: pointer; }
+#s-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 1000; }
+#s-overlay.active { display: block; }
+
+
+#music-player { display: none; }
+</style>
+</head>
+<body>
+
+<iframe id="music-player" src="https://www.youtube.com/embed/Tivfxoj1_Cg?enablejsapi=1&loop=1&playlist=Tivfxoj1_Cg" allow="autoplay"></iframe>
+
+<div id="settings-btn" onclick="toggleS()">⚙️ Настройки</div>
+<div id="s-overlay" onclick="toggleS()"></div>
+
+<div id="settings-panel">
+    <h3>Настройки</h3>
+    <div class="s-row">Громкость музыки <input type="range" id="vol-range" min="0" max="100" value="50" oninput="updateVolume(this.value)"></div>
+    <div class="s-row">Цвет змейки <input type="color" id="s-color-sync" value="#00ffcc" oninput="snakeColor = this.value"></div>
+    <div class="s-row">Скин хвоста 
+        <select id="s-tail-sync">
+            <option value="normal">Обычный</option>
+            <option value="long">Длинный</option>
+            <option value="short">Короткий</option>
+        </select>
+    </div>
+    <hr>
+    <h4>Управление</h4>
+    <div class="s-row">Вверх <div class="key-set" onclick="listenKey('up')" id="set-up">W</div></div>
+    <div class="s-row">Вниз <div class="key-set" onclick="listenKey('down')" id="set-down">S</div></div>
+    <div class="s-row">Влево <div class="key-set" onclick="listenKey('left')" id="set-left">A</div></div>
+    <div class="s-row">Вправо <div class="key-set" onclick="listenKey('right')" id="set-right">D</div></div>
+    <br>
+    <button onclick="toggleS()" style="width:100%">Закрыть</button>
+</div>
+
+<div id="menu">
+  <h1> Змейка PRO</h1>
+  <label>Ваш ник:</label><br>
+  <input id="nickname" placeholder="Введите ник"><br>
+  <label>Язык:</label><br>
+  <select id="language">
+    <option value="ru">Русский</option>
+    <option value="uk">Українська</option>
+    <option value="en">English</option>
+    <option value="cn">中文</option>
+  </select><br>
+  <button id="start-btn" style="width: 100px;">Старт</button>
+  <button onclick="showLeaderboard()">Рекорды</button>
+</div>
+
+<div id="game-container">
+  <canvas id="game" width="420" height="420"></canvas>
+  <div id="game-info">
+    <div>Размер яблока: <span id="appleSizeDisplay">18</span></div>
+    <div>Скорость змейки: <span id="speedDisplay">10</span></div>
+  </div>
+  <div>Очки: <span id="score">0</span></div>
+  <div>Рекорд: <span id="best">0</span></div>
+  <button onclick="togglePause()">Пауза (P)</button>
+  <button onclick="exitToMenu()">Выход в меню</button>
+</div>
+
+<div id="leaderboard-menu">
+  <h2>Топ рекордов</h2>
+  <div id="leaderboard-list"></div>
+  <button onclick="backToMenu()">← Назад</button>
+</div>
+
+<div id="creator">By. Drax</div>
+<div id="version">Версия: 1.03.6</div>
+<div id="deviceInfo">Загрузка данных...</div>
+
+<div id="admin-panel">
+  <h3>Админ-панель</h3>
+  <button onclick="addScore(10)">+10 Очков</button>
+  <button onclick="changeSpeed(1)">+ Скорость</button>
+</div>
+
+<div id="admin-input-container">
+  <input id="admin-code" placeholder="Код админа">
+  <button onclick="checkAdmin()">Войти</button>
+</div>
+
+<script>
+// Музыкальная логика
+let player;
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player('music-player', {
+        events: {
+            'onReady': (event) => { event.target.setVolume(50); }
+        }
+    });
+}
+function updateVolume(v) { if(player && player.setVolume) player.setVolume(v); }
+
+// Настройки управления
+let customKeys = { up:'w', down:'s', left:'a', right:'d' };
+let waitKey = null;
+
+function toggleS() {
+    document.getElementById('settings-panel').classList.toggle('active');
+    document.getElementById('s-overlay').classList.toggle('active');
+}
+
+function listenKey(dir) { waitKey = dir; document.getElementById('set-'+dir).innerText = '...'; }
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const grid = 20;
+let snake, apple, score, nickname, best;
+let speed = 10;
+let snakeColor = '#00ffcc';
+let appleSize = grid-2;
+let paused = false;
+let lastTime = 0;
+
+function saveScore(){
+  let leaderboard = JSON.parse(localStorage.getItem('snake_leaderboard')||'[]');
+  leaderboard.push({nick:nickname, score, date:new Date().toLocaleString()});
+  leaderboard.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('snake_leaderboard', JSON.stringify(leaderboard.slice(0,50)));
+}
+
+function showLeaderboard(){
+  document.getElementById('menu').style.display='none';
+  document.getElementById('leaderboard-menu').style.display='flex';
+  const list = document.getElementById('leaderboard-list');
+  let lb = JSON.parse(localStorage.getItem('snake_leaderboard')||'[]');
+  list.innerHTML = lb.map((e,i)=>`${i+1}. ${e.nick} - ${e.score}`).join('<br>') || "Нет рекордов";
+}
+
+function backToMenu(){ document.getElementById('menu').style.display='flex'; document.getElementById('leaderboard-menu').style.display='none'; }
+
+function checkAdmin(){ if(document.getElementById('admin-code').value==='1234') document.getElementById('admin-panel').style.display='flex'; }
+function addScore(n){ score+=n; document.getElementById('score').textContent=score; }
+function changeSpeed(n){ speed=Math.min(Math.max(1, speed+n),20); document.getElementById('speedDisplay').textContent=speed; }
+
+document.getElementById('start-btn').onclick = ()=>{
+  nickname = document.getElementById('nickname').value.trim();
+  if(!nickname){ alert('Введите ник!'); return; }
+  document.getElementById('menu').style.display='none';
+  document.getElementById('game-container').style.display='flex';
+  best = localStorage.getItem('snake_best_'+nickname)||0;
+  document.getElementById('best').textContent = best;
+  if(player && player.playVideo) player.playVideo(); // Запуск музыки при старте
+  init();
+  requestAnimationFrame(loop);
+};
+
+function init(){
+  snake = {x:160,y:160,dx:grid,dy:0,cells:[],maxCells:4};
+  apple = {x:320,y:320};
+  score=0; paused=false;
+  document.getElementById('score').textContent=score;
+}
+
+function loop(timestamp){
+  if(paused) return;
+  requestAnimationFrame(loop);
+  if(!lastTime) lastTime = timestamp;
+  if(timestamp - lastTime < (200 - (speed-1)*10)) return;
+  lastTime = timestamp;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  snake.x += snake.dx; snake.y += snake.dy;
+  if(snake.x<0||snake.x>=canvas.width||snake.y<0||snake.y>=canvas.height) return gameOver();
+  snake.cells.unshift({x:snake.x,y:snake.y});
+  if(snake.cells.length>snake.maxCells) snake.cells.pop();
+  ctx.fillStyle='red'; ctx.fillRect(apple.x,apple.y,appleSize,appleSize);
+  snake.cells.forEach((cell,i)=>{
+    ctx.fillStyle = i===0 ? snakeColor : '#00aa88';
+    ctx.fillRect(cell.x,cell.y,grid-2,grid-2);
+    if(cell.x===apple.x && cell.y===apple.y){
+      snake.maxCells++; score++;
+      document.getElementById('score').textContent=score;
+      apple.x=Math.floor(Math.random()*21)*grid; apple.y=Math.floor(Math.random()*21)*grid;
+    }
+    for(let j=i+1;j<snake.cells.length;j++) if(cell.x===snake.cells[j].x && cell.y===snake.cells[j].y) gameOver();
+  });
+}
+
+function gameOver(){
+  paused=true;
+  if(score>best){ localStorage.setItem('snake_best_'+nickname, score); }
+  saveScore();
+  alert(`Конец игры! Счёт: ${score}`);
+  exitToMenu();
+}
+
+function exitToMenu(){ document.getElementById('game-container').style.display='none'; document.getElementById('menu').style.display='flex'; }
+function togglePause(){ paused = !paused; if(!paused) requestAnimationFrame(loop); }
+
+window.addEventListener('keydown', e=>{
+  if(waitKey) {
+    customKeys[waitKey] = e.key.toLowerCase();
+    document.getElementById('set-'+waitKey).innerText = e.key.toUpperCase();
+    waitKey = null;
+    return;
+  }
+  const key=e.key.toLowerCase();
+  if(key===customKeys.left && snake.dx===0){ snake.dx=-grid; snake.dy=0; }
+  else if(key===customKeys.up && snake.dy===0){ snake.dy=-grid; snake.dx=0; }
+  else if(key===customKeys.right && snake.dx===0){ snake.dx=grid; snake.dy=0; }
+  else if(key===customKeys.down && snake.dy===0){ snake.dy=grid; snake.dx=0; }
+  if(key==='p') togglePause();
+});
+
+// Загрузка API YouTube
+var tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+var firstScriptTag = document.getElementsByTagName('script')[0];
+firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+document.getElementById('deviceInfo').innerText = `Устройство: ${navigator.platform}`;
+</script>
+const SUPABASE_URL = https://jwshweuxwmvidrzcshzj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3c2h3ZXV4d212aWRyemNzaHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNzE0OTEsImV4cCI6MjA4OTk0NzQ5MX0.W0kiGDoQqb6PwjDrA1IO8AckusGUDuivV_D1J5UFJRc';
+</body>
+</html>
